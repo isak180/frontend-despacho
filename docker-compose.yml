@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: frontend-despacho
+    image: front-despacho:latest
+    ports:
+      - "80:80"
+    environment:
+      # URL del backend Despachos (IP privada de la EC2 backend en AWS)
+      - VITE_API_DESPACHOS=${VITE_API_DESPACHOS:-http://localhost:8080}
+      # URL del backend Ventas
+      - VITE_API_VENTAS=${VITE_API_VENTAS:-http://localhost:8081}
+    restart: unless-stopped
+    networks:
+      - frontend-net
+
+networks:
+  frontend-net:
+    driver: bridge

@@ -1,0 +1,62 @@
+name: CI/CD Frontend - Despacho
+
+# Se activa solo con push en la rama deploy
+on:
+  push:
+    branches:
+      - deploy
+
+jobs:
+  build-push-deploy:
+    name: Build, Push y Deploy Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout del código
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      # 2. Configurar credenciales AWS
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 3. Login en Amazon ECR
+      - name: Login en Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 4. Build de la imagen Docker y push a ECR
+      - name: Build y Push imagen a ECR
+        env:
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          ECR_REPO: ${{ secrets.ECR_REPO_FRONTEND }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPO:latest
+          docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPO:latest
+          echo "IMAGE=$ECR_REGISTRY/$ECR_REPO:latest" >> $GITHUB_ENV
+
+      # 5. Deploy automático en EC2 Frontend (subred pública)
+      - name: Deploy en EC2 Frontend
+        uses: aws-actions/aws-ssm-send-command@v1
+        with:
+          instance-ids: ${{ secrets.EC2_FRONTEND_INSTANCE_ID }}
+          comment: "Deploy frontend desde GitHub Actions"
+          document-name: "AWS-RunShellScript"
+          parameters: |
+            {
+              "commands": [
+                "aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}",
+                "docker pull ${{ env.IMAGE }}",
+                "docker stop frontend-despacho || true",
+                "docker rm frontend-despacho || true",
+                "docker run -d --name frontend-despacho --restart unless-stopped -p 80:80 -e VITE_API_DESPACHOS=${{ secrets.VITE_API_DESPACHOS }} -e VITE_API_VENTAS=${{ secrets.VITE_API_VENTAS }} ${{ env.IMAGE }}"
+              ]
+            }
