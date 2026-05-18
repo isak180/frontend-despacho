@@ -47,7 +47,7 @@ jobs:
       - name: Deploy en EC2 Frontend
         run: |
           aws ssm send-command \
-            --instance-ids "${{ secrets.EC2_FRONTEND_INSTANCE_ID }}" \
+            --instance-ids "i-03f206eef53cb655" \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy frontend desde GitHub Actions" \
             --parameters '{"commands":["aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}", "docker pull ${{ env.IMAGE }}", "docker stop frontend-despacho || true", "docker rm frontend-despacho || true", "docker run -d --name frontend-despacho --restart unless-stopped -p 80:80 -e VITE_API_DESPACHOS=${{ secrets.VITE_API_DESPACHOS }} -e VITE_API_VENTAS=${{ secrets.VITE_API_VENTAS }} ${{ env.IMAGE }}"]}'
