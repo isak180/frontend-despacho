@@ -43,20 +43,17 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPO:latest
           echo "IMAGE=$ECR_REGISTRY/$ECR_REPO:latest" >> $GITHUB_ENV
 
-      # 5. Deploy automático en EC2 Frontend (subred pública)
+      # 5. Deploy automático en EC2 Frontend (Nativo y sin corchetes)
       - name: Deploy en EC2 Frontend
-        uses: aws-actions/aws-ssm-send-command@v1
-        with:
-          instance-ids: ${{ secrets.EC2_FRONTEND_INSTANCE_ID }}
-          comment: "Deploy frontend desde GitHub Actions"
-          document-name: "AWS-RunShellScript"
-          parameters: |
-            {
-              "commands": [
-                "aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}",
-                "docker pull ${{ env.IMAGE }}",
-                "docker stop frontend-despacho || true",
-                "docker rm frontend-despacho || true",
-                "docker run -d --name frontend-despacho --restart unless-stopped -p 80:80 -e VITE_API_DESPACHOS=${{ secrets.VITE_API_DESPACHOS }} -e VITE_API_VENTAS=${{ secrets.VITE_API_VENTAS }} ${{ env.IMAGE }}"
-              ]
-            }
+        env:
+          RAW_ID: ${{ secrets.EC2_FRONTEND_INSTANCE_ID }}
+        run: |
+          # Limpiamos cualquier carácter basura del Secreto por seguridad
+          CLEAN_ID=$(echo "$RAW_ID" | tr -d '[]"')
+          
+          # Lanzamos el comando nativo a AWS Systems Manager
+          aws ssm send-command \
+            --instance-ids "$CLEAN_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy frontend desde GitHub Actions" \
+            --parameters '{"commands":["aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}", "docker pull ${{ env.IMAGE }}", "docker stop frontend-despacho || true", "docker rm frontend-despacho || true", "docker run -d --name frontend-despacho --restart unless-stopped -p 80:80 -e VITE_API_DESPACHOS=${{ secrets.VITE_API_DESPACHOS }} -e VITE_API_VENTAS=${{ secrets.VITE_API_VENTAS }} ${{ env.IMAGE }}"]}'
