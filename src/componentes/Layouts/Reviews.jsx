@@ -9,7 +9,7 @@ function Reviews() {
           <img
             className="col-span-2 max-h-12 w-full object-contain lg:col-span-1 mx-auto"
             src="https://seeklogo.com/images/A/apple-logo-E3DBF3AE34-seeklogo.com.png"
-            alt="Transistor"
+            alt="isak"
             width="158"
             height="48"
           />
